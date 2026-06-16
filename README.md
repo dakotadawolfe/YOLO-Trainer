@@ -1,135 +1,152 @@
-# YOLO Dataset Creator (Screen Tracker)
+# YOLO Trainer
 
-Capture **only the game window**, select an object, track it, and save images + YOLO labels. The bot also runs YOLO on the game window only, so training and inference match. Use one workflow for **any** target (mound_dharok, banker, barrows_chest, etc.). Final trained models live in **assets/templates/yolo/**; you can delete the YOLO Trainer folder after you’re done.
+YOLO Trainer is a Windows helper workflow for building small object-detection models from live game-window captures. It lets you select an object on screen, track it, save YOLO-format images and labels, train an Ultralytics model, and copy the resulting weights into a bot template folder.
 
-## All-in-one workflow (recommended)
+The scripts were written for game automation projects where the training capture and runtime inference need to use the same game-window region.
 
-One script does everything: track → yaml → train → copy → optionally clean for next target.
+## Features
 
-```bash
-python "YOLO Trainer/yolo_workflow.py" full mound_dharok
-```
+- Captures the active game window when a parent project provides `config.py` and `game_io.py`.
+- Falls back to full-screen capture when no game-window helper is available.
+- Uses OpenCV CSRT tracking after you select an object.
+- Saves clean training frames without drawing the tracker overlay.
+- Creates `data.yaml` for single-class YOLO training.
+- Trains with Ultralytics YOLO.
+- Copies `best.pt` to `assets/templates/yolo/<target>.pt` in the parent project.
+- Includes an all-in-one workflow for capture, YAML creation, training, copy, and cleanup.
 
-Track (S = select, ESC = exit) → yaml + train + copy → at end, answer **y** to delete dataset/yaml/runs for a fresh next run. Individual steps: `track`, `yaml`, `train`, `copy`, `clean` (see script help).
+## Requirements
 
-## Setup
+- Windows.
+- Python 3.10 or newer.
+- A visible game window.
+- Python packages from `requirements.txt`.
+- NVIDIA GPU recommended for training, though Ultralytics can run on CPU with different settings.
 
-From the **Barrows Bot** project root:
+Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Requires: `opencv-contrib-python`, `dxcam` (Windows).
+## Repository Layout
 
----
-
-## Dynamic workflow (any target)
-
-### 1. Set TARGET in the tracker
-
-In **yolo_auto_dataset_tracker.py** at the top:
-
-- **TARGET** = the object name, e.g. `"mound_dharok"`, `"banker"`, `"barrows_chest"`.
-- **CLASS_NAME** = optional. Class name in labels (default: CamelCase from TARGET). Use for custom names like `"DharokMound"`.
-
-Data is saved to `YOLO Trainer/dataset_<TARGET>/` (e.g. `dataset_mound_dharok`).
-
-### 2. Run the tracker
-
-Ensure the **game window is open** and its title matches **GAME_WINDOW_TITLE_SUBSTRING** in `config.py` (e.g. `RuneLite`). The tracker captures only that window (same as the bot at inference).
-
-```bash
-python "YOLO Trainer/yolo_auto_dataset_tracker.py" mound_dharok
+```text
+.
+|-- yolo_workflow.py              # All-in-one workflow
+|-- yolo_auto_dataset_tracker.py  # Manual select-and-track dataset capture
+|-- create_data_yaml.py           # Generate data.yaml for a target
+|-- copy_to_templates.py          # Copy best.pt to parent assets/templates/yolo
+|-- yolo_finder.py                # Runtime detector helper for bot projects
+|-- test_yolo_tracking.py         # Tracking checks
+|-- models/                       # Base model files
+`-- requirements.txt
 ```
 
-You should see `Capture: game window only (matches bot YOLO lookup)`. Press **S**, draw a box around the object, confirm. Move the camera for variety. Press **ESC** when done.
+## Basic Workflow
 
-### 3. Generate data.yaml
-
-From project root:
+Run from this repository root:
 
 ```bash
-python "YOLO Trainer/create_data_yaml.py" <target> [--class-name ClassName]
+python yolo_workflow.py full mound_dharok
 ```
 
-Examples:
+That command:
+
+1. Opens the tracker.
+2. Lets you press `S` and draw a bounding box around the target.
+3. Saves images and labels to `dataset_mound_dharok/`.
+4. Writes `mound_dharok/data.yaml`.
+5. Trains a YOLO model.
+6. Copies the trained weights.
+7. Offers to clean temporary dataset and run folders.
+
+## Tracker Controls
+
+- `S`: select object.
+- `R`: reset tracker and reselect.
+- `P`: pause or resume saving frames.
+- `Esc`: exit.
+
+Move the camera or scene while tracking so the dataset contains useful variation.
+
+## Individual Commands
+
+Capture only:
 
 ```bash
-python "YOLO Trainer/create_data_yaml.py" mound_dharok --class-name DharokMound
-python "YOLO Trainer/create_data_yaml.py" banker
+python yolo_workflow.py track mound_dharok
 ```
 
-This creates `YOLO Trainer/<target>/data.yaml` pointing at `dataset_<target>/`.
-
-### 4. Train
-
-From project root:
+Create YAML:
 
 ```bash
-yolo detect train data="YOLO Trainer/<target>/data.yaml" model=yolov8n.pt epochs=50
+python yolo_workflow.py yaml mound_dharok
 ```
 
-Example:
+Train:
 
 ```bash
-yolo detect train data="YOLO Trainer/mound_dharok/data.yaml" model=yolov8n.pt epochs=50
+python yolo_workflow.py train mound_dharok --epochs 50 --device 0 --imgsz 640
 ```
 
-### 5. Copy weights to templates (final step)
-
-This puts the model where the bot expects it. After this you can delete the YOLO Trainer folder.
+Copy weights:
 
 ```bash
-python "YOLO Trainer/copy_to_templates.py" <target> [--run-dir runs/detect/train]
+python yolo_workflow.py copy mound_dharok
 ```
 
-Example:
+Clean generated files for a target:
 
 ```bash
-python "YOLO Trainer/copy_to_templates.py" mound_dharok
+python yolo_workflow.py clean mound_dharok
 ```
 
-This copies `runs/detect/train/weights/best.pt` to **assets/templates/yolo/mound_dharok.pt**. Config already points to `assets/templates/yolo/<target>.pt` for known targets.
+You can also run the capture and YAML scripts directly:
 
-### 6. Use in the bot
+```bash
+python yolo_auto_dataset_tracker.py mound_dharok
+python create_data_yaml.py mound_dharok --class-name MoundDharok
+```
 
-- In **config.py**, **USE_YOLO_FOR** must include the template name (e.g. `["mound_dharok"]`).
-- **YOLO_CAPTURE_GAME_WINDOW = True** so the bot only runs YOLO on the game window (matches training).
-- Model path is already set to `assets/templates/yolo/<target>.pt` for mound_dharok and banker.
-- Class name must match the one in your data.yaml (e.g. **YOLO_MOUND_DHAROK_CLASS** = `"MoundDharok"`).
+`copy_to_templates.py` is meant for the parent-project layout shown below. When this repository is used standalone, copy the trained `best.pt` manually or run the `copy` step through `yolo_workflow.py`, which knows about this folder's local `runs/` directory.
 
-No code changes needed; the bot will use YOLO for any template in **USE_YOLO_FOR** that has a model in **assets/templates/yolo/**.
+## Parent Project Expectations
 
----
+Some scripts assume this folder lives inside a larger bot project:
 
-## Tracker controls
+```text
+ParentProject/
+|-- config.py
+|-- game_io.py
+|-- assets/templates/yolo/
+`-- YOLO-Trainer/
+```
 
-- **S** = select object (draw box, then Space/Enter).
-- **R** = reset tracker (then press **S** again to reselect).
-- **P** = pause/resume saving.
-- **ESC** = exit.
+When `config.py` and `game_io.py` are present in the parent project, the tracker captures only the game window and `copy_to_templates.py` writes to `../assets/templates/yolo/`.
 
-Single window; labels use class 0 when **SINGLE_CLASS_MODE** is True.
+If you use this repository standalone, the trainer still works, but you may need to copy the final `.pt` file manually from the training output into the project that will use it.
 
----
+## Runtime Detector
 
-## Adding a new YOLO target
+`yolo_finder.py` provides a `find_yolo(template_name, region=None, confidence=0.5)` helper that returns `(x, y, w, h)` screen coordinates. It expects the parent project's `config.py` to define `YOLO_TARGETS` entries with model path, class, and optional confidence values.
 
-1. In **yolo_finder.py**, add the template name to **_YOLO_TARGET_CONFIG** with its config keys (e.g. `"barrows_chest": ("YOLO_CHEST_MODEL", "YOLO_CHEST_CLASS")`).
-2. In **config.py**, add `YOLO_<NAME>_MODEL` and `YOLO_<NAME>_CLASS`, and add the template to **USE_YOLO_FOR**.
-3. In the tracker set **TARGET** = that name (e.g. `"barrows_chest"`), collect data, run **create_data_yaml.py**, train, then **copy_to_templates.py**.
-4. Ensure **YOLO_<NAME>_MODEL** points to `assets/templates/yolo/<target>.pt` (same pattern as mound_dharok/banker).
+Example shape:
 
----
+```python
+YOLO_TARGETS = {
+    "mound_dharok": {
+        "model": "assets/templates/yolo/mound_dharok.pt",
+        "class": "MoundDharok",
+        "conf": 0.5,
+    }
+}
+```
 
-## Summary
+## Tips
 
-| Step | Command / action |
-|------|-------------------|
-| 1 | Set **TARGET** (and optional **CLASS_NAME**) in `yolo_auto_dataset_tracker.py`. |
-| 2 | `python "YOLO Trainer/yolo_auto_dataset_tracker.py"` → collect data. |
-| 3 | `python "YOLO Trainer/create_data_yaml.py" <target> [--class-name X]` |
-| 4 | `yolo detect train data="YOLO Trainer/<target>/data.yaml" model=yolov8n.pt epochs=50` |
-| 5 | `python "YOLO Trainer/copy_to_templates.py" <target>` |
-| 6 | Bot uses **assets/templates/yolo/<target>.pt**; you can delete the YOLO Trainer folder. |
+- Keep training capture and runtime inference on the same display and game-window scale.
+- Save enough frames from different camera angles and lighting states.
+- Use one target per dataset unless you intentionally expand the scripts for multi-class training.
+- Put base models such as `yolov8n.pt` in `models/` so repeated runs do not download them into the working directory.
+- If detection fails, enable debug frame saving in the parent config and inspect what image YOLO actually received.
