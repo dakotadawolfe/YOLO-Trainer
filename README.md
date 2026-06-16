@@ -150,3 +150,7 @@ YOLO_TARGETS = {
 - Use one target per dataset unless you intentionally expand the scripts for multi-class training.
 - Put base models such as `yolov8n.pt` in `models/` so repeated runs do not download them into the working directory.
 - If detection fails, enable debug frame saving in the parent config and inspect what image YOLO actually received.
+
+## License
+
+GPL-3.0. See `LICENSE`.
