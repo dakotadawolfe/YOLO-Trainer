@@ -1,13 +1,13 @@
-# YOLO Trainer
+# YOLO Training Workflow
 
-YOLO Trainer is a Windows helper workflow for building small object-detection models from live game-window captures. It lets you select an object on screen, track it, save YOLO-format images and labels, train an Ultralytics model, and copy the resulting weights into a bot template folder.
+YOLO Training Workflow is a Windows and Python toolkit for building focused object-detection models from live application-window captures. It supports interactive target selection, OpenCV tracking, YOLO-format dataset generation, Ultralytics training, and export of the resulting weights for downstream inference projects.
 
-The scripts were written for game automation projects where the training capture and runtime inference need to use the same game-window region.
+The workflow was designed for projects where training capture and runtime inference must use the same window region, scale, and coordinate system.
 
 ## Features
 
-- Captures the active game window when a parent project provides `config.py` and `game_io.py`.
-- Falls back to full-screen capture when no game-window helper is available.
+- Captures a target application window when a parent project provides `config.py` and `game_io.py`.
+- Falls back to full-screen capture when no window helper is available.
 - Uses OpenCV CSRT tracking after you select an object.
 - Saves clean training frames without drawing the tracker overlay.
 - Creates `data.yaml` for single-class YOLO training.
@@ -19,7 +19,7 @@ The scripts were written for game automation projects where the training capture
 
 - Windows.
 - Python 3.10 or newer.
-- A visible game window.
+- A visible target application window.
 - Python packages from `requirements.txt`.
 - NVIDIA GPU recommended for training, though Ultralytics can run on CPU with different settings.
 
@@ -37,7 +37,7 @@ pip install -r requirements.txt
 |-- yolo_auto_dataset_tracker.py  # Manual select-and-track dataset capture
 |-- create_data_yaml.py           # Generate data.yaml for a target
 |-- copy_to_templates.py          # Copy best.pt to parent assets/templates/yolo
-|-- yolo_finder.py                # Runtime detector helper for bot projects
+|-- yolo_finder.py                # Runtime detector helper for downstream projects
 |-- test_yolo_tracking.py         # Tracking checks
 |-- models/                       # Base model files
 `-- requirements.txt
@@ -113,17 +113,17 @@ python create_data_yaml.py mound_dharok --class-name MoundDharok
 
 ## Parent Project Expectations
 
-Some scripts assume this folder lives inside a larger bot project:
+Some scripts assume this folder lives inside a larger runtime-inference project:
 
 ```text
 ParentProject/
 |-- config.py
 |-- game_io.py
 |-- assets/templates/yolo/
-`-- YOLO-Trainer/
+`-- yolo-training-workflow/
 ```
 
-When `config.py` and `game_io.py` are present in the parent project, the tracker captures only the game window and `copy_to_templates.py` writes to `../assets/templates/yolo/`.
+When `config.py` and `game_io.py` are present in the parent project, the tracker captures only the configured application window and `copy_to_templates.py` writes to `../assets/templates/yolo/`.
 
 If you use this repository standalone, the trainer still works, but you may need to copy the final `.pt` file manually from the training output into the project that will use it.
 
@@ -145,7 +145,7 @@ YOLO_TARGETS = {
 
 ## Tips
 
-- Keep training capture and runtime inference on the same display and game-window scale.
+- Keep training capture and runtime inference on the same display and application-window scale.
 - Save enough frames from different camera angles and lighting states.
 - Use one target per dataset unless you intentionally expand the scripts for multi-class training.
 - Put base models such as `yolov8n.pt` in `models/` so repeated runs do not download them into the working directory.
